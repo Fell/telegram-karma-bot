@@ -7,6 +7,7 @@ import datetime, time
 import telepot
 import redis
 import operator
+from operator import itemgetter
 
 BOT_TOKEN =  '123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 
@@ -28,10 +29,12 @@ except ConnectionError:
     print "Redis connection failed"
     raise SystemExit(1)
 
-def handle_karma(msg,direction):
+def handle_vote(msg,direction):
     duser = msg['text'].split()[1]
     suser = msg['from']['id']
-    sname = msg['from']['username']
+
+    sname = ''
+    if 'username' in msg['from']: sname = msg['from']['username']
 
     if duser.startswith('@'): duser = duser[1:]
 
@@ -55,23 +58,32 @@ def handle_karma(msg,direction):
         r.hincrby(duser,'0karma_',-1)
     return u"@{}'s karma is now *{}*".format(duser, r.hget(duser,'0karma_'))
 
-def get_rank(_for):
-    vals = None
-    rank = "not found"
-    limiter = 10
-    if _for:
-        if _for.startswith('@'): _for = _for[1:]
-	_for = _for.lower()
-        keys = r.keys('*{0}*'.format(_for))
-    if len(keys) > 0: rank = ''
+def handle_top():
+    result = ''
+    list = {}
+
+    keys = r.keys('*')
+
     for key in keys:
-        if r.type(key) == 'hash':
-            vals = r.hgetall(key)
-            rank = ''.join([rank, key, ": ", vals['0karma_'], "\r\n"])
-            limiter -= 1
-        if limiter == 0:
-            break
-    return 'Rating for *{0}*:\r\n{1}'.format(_for, rank)
+        if r.type(key) == 'hash': 
+            list[key] = r.hget(key, '0karma_')
+
+    list = sorted(list.items(), key=itemgetter(1), reverse=True)
+
+    counter = 1
+    for (user, karma) in list:
+        result += "{}. @{}: *{}*\r\n".format(counter, user, karma)
+        counter += 1
+        if(counter > 10): break
+
+    return 'Karma Top 10:\r\n{}'.format(result)
+
+def handle_karma(duser):
+
+    if duser.startswith('@'): duser = duser[1:]
+    duser = duser.lower()
+
+    return u"@{} has *{}* karma.".format(duser, r.hget(duser,'0karma_'))
 
 def handle(msg):
     chat_id = msg['chat']['id']
@@ -97,14 +109,16 @@ def handle(msg):
 
     if command == '/roll':
         bot.sendMessage(chat_id, random.randint(1,6))
-    if command == '/rank':
-        if param: bot.sendMessage(chat_id, get_rank(param), parse_mode='Markdown')
+    elif command == '/top':
+        bot.sendMessage(chat_id, handle_top(), parse_mode='Markdown')
+    elif command == '/karma' or command == '/rank':
+        if param: bot.sendMessage(chat_id, handle_karma(param), parse_mode='Markdown')
         else: bot.sendMessage(chat_id, 'Usage: {} username'.format(command))
     elif command == '/+' or command == '/plus':
-        if param: bot.sendMessage(chat_id, handle_karma(msg, 'up'), parse_mode='Markdown')
+        if param: bot.sendMessage(chat_id, handle_vote(msg, 'up'), parse_mode='Markdown')
         else: bot.sendMessage(chat_id, 'Usage: {} username'.format(command))
     elif command == '/-' or command == '/minus':
-        if param: bot.sendMessage(chat_id, handle_karma(msg, 'down'), parse_mode='Markdown')
+        if param: bot.sendMessage(chat_id, handle_vote(msg, 'down'), parse_mode='Markdown')
         else: bot.sendMessage(chat_id, 'Usage: {} username'.format(command))
     elif command == '/help':
         if chat_type == "private":
