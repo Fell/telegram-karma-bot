@@ -108,7 +108,8 @@ def handle(msg):
     print "Got command: {} {} from: {}".format(command,param,from_name)
 
     if command == '/roll':
-        bot.sendMessage(chat_id, random.randint(1,6))
+        if param: bot.sendMessage(chat_id, '@{} rolls {}'.format(from_name, random.randint(1,int(param))))
+        else: bot.sendMessage(chat_id, '@{} rolls {}'.format(from_name, random.randint(1,100)))
     elif command == '/top':
         bot.sendMessage(chat_id, handle_top(), parse_mode='Markdown')
     elif command == '/karma' or command == '/rank':
