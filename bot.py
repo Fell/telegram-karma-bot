@@ -32,7 +32,12 @@ def handle_karma(msg,direction):
     duser = msg['text'].split()[1]
     suser = msg['from']['id']
     sname = msg['from']['username']
+
     if duser.startswith('@'): duser = duser[1:]
+
+    duser = duser.lower()
+    sname = sname.lower()
+
     now = time.time()
     last = r.hget(duser, suser)
     delta = 31337
@@ -48,7 +53,7 @@ def handle_karma(msg,direction):
         r.hincrby(duser,'0karma_',1)
     elif direction == 'down':
         r.hincrby(duser,'0karma_',-1)
-    return u"{} karma is now {}".format(duser, r.hget(duser,'0karma_'))
+    return u"@{}'s karma is now *{}*".format(duser, r.hget(duser,'0karma_'))
 
 def get_rank(_for):
     vals = None
@@ -56,6 +61,7 @@ def get_rank(_for):
     limiter = 10
     if _for:
         if _for.startswith('@'): _for = _for[1:]
+	_for = _for.lower()
         keys = r.keys('*{0}*'.format(_for))
     if len(keys) > 0: rank = ''
     for key in keys:
@@ -65,7 +71,7 @@ def get_rank(_for):
             limiter -= 1
         if limiter == 0:
             break
-    return '=== Rating for "{0}" ===\r\n{1}'.format(_for, rank)
+    return 'Rating for *{0}*:\r\n{1}'.format(_for, rank)
 
 def handle(msg):
     chat_id = msg['chat']['id']
@@ -92,13 +98,13 @@ def handle(msg):
     if command == '/roll':
         bot.sendMessage(chat_id, random.randint(1,6))
     if command == '/rank':
-        if param: bot.sendMessage(chat_id, get_rank(param))
+        if param: bot.sendMessage(chat_id, get_rank(param), parse_mode='Markdown')
         else: bot.sendMessage(chat_id, 'Usage: {} username'.format(command))
     elif command == '/+' or command == '/plus':
-        if param: bot.sendMessage(chat_id, handle_karma(msg, 'up'))
+        if param: bot.sendMessage(chat_id, handle_karma(msg, 'up'), parse_mode='Markdown')
         else: bot.sendMessage(chat_id, 'Usage: {} username'.format(command))
     elif command == '/-' or command == '/minus':
-        if param: bot.sendMessage(chat_id, handle_karma(msg, 'down'))
+        if param: bot.sendMessage(chat_id, handle_karma(msg, 'down'), parse_mode='Markdown')
         else: bot.sendMessage(chat_id, 'Usage: {} username'.format(command))
     elif command == '/help':
         if chat_type == "private":
@@ -107,7 +113,7 @@ def handle(msg):
             bot.sendMessage(chat_id, "Talk to me privately for help.")
 
 bot = telepot.Bot(BOT_TOKEN)
-bot.notifyOnMessage(handle)
+bot.message_loop(handle)
 print 'I am listening ...'
 
 while 1:
